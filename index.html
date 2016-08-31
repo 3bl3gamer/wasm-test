@@ -78,7 +78,7 @@
 				rc.putImageData(pix, x, y)
 				
 				if (++i >= n) { i=0; j++ }
-				if (j >= n) { clearInterval(interval); alert(Date.now()-stt) }
+				if (j >= n) { clearInterval(interval); alert("Done, "+(Date.now()-stt)+"ms.") }
 			}, 1)
 		}
 	</script>
@@ -88,7 +88,13 @@
 		canvas.width = rect.width * devicePixelRatio
 		canvas.height = rect.height * devicePixelRatio
 		var rc = canvas.getContext("2d")
-		//setTimeout(function(){ runTest(rc, jsModule) }, 50)
-		wasmModulePromise.then(wasmModule => runTest(rc, wasmModule))
+		
+		if (location.hash == "#js") {
+			alert("Will run generation via pure JS.\nRemove \"#js\" and reload to use WASM.")
+			setTimeout(function(){ runTest(rc, jsModule) }, 50)
+		} else {
+			alert("Will run generation via WASM.\nAdd \"#js\" to url and reload to use pure JS.")
+			wasmModulePromise.then(wasmModule => runTest(rc, wasmModule))
+		}
 	</script>
 </html>
