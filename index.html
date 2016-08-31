@@ -1,0 +1,94 @@
+<html>
+	<head>
+		<title>Wasm fractal generator</title>
+		<meta charset="utf-8">
+	</head>
+	
+	<body style="margin:0">
+		<canvas id="canvas" style="width:100%; height:100%"></canvas>
+	</body>
+	
+	<script>
+		var jsModule = (function(){
+			// аналог WASM'овой памяти, чтоб оба способа больше походили друг на друга
+			var pixels = new Uint8Array(128*65536)
+			var memory = pixels.buffer
+			
+			function getPixVal(da, db, iters) {
+				var a=da, b=db, k=iters
+				while(--k > 0 && a*a+b*b < 4) {
+					var t = a*a - b*b + da
+					b = 2*a*b + db
+					a = t
+				}
+				return Math.pow(k/iters, 16)
+			}
+			
+			function getSampledPixVal(da, db, h_pix_size, v_pix_size, iters) {
+				var sum=0, o=2, n=o*2+1, dh=h_pix_size/n, dv=v_pix_size/n
+				for (var i=-o; i<=o; i++) {
+					for (var j=-o; j<=o; j++) {
+						sum += getPixVal(da+dh*i, db+dv*j, iters)
+					}
+				}
+				return sum/n/n
+			}
+			
+			function renderPart(width, height, xo, yo, w, h) {
+				for (var i=0; i<w; i++) {
+					for (var j=0; j<h; j++) {
+						var scale=2.8, iters=256
+						var da = -(0.73-(xo+i)/width )*scale
+						var db =  (0.5 -(yo+j)/height)*scale
+						pixels[(i+j*w)*4+3] = 255*getSampledPixVal(da, db, scale/width, scale/height, iters)
+					}
+				}
+			}
+			
+			return {exports: {memory, renderPart}}
+		})()
+	</script>
+	
+	<script>
+		var wasmModulePromise = fetch("main.wasm").
+			then(res => res.arrayBuffer()).
+			then(buf => Wasm.instantiateModule(new Uint8Array(buf)))
+	</script>
+	
+	<script>
+		function runTest(rc, module) {
+			console.log('running test using', module)
+			var width = rc.canvas.width
+			var height = rc.canvas.height
+			
+			var stt = Date.now()
+			var i=0, j=0 //номер текущей части
+			var n = 4 //кол-во частей по каждой из осей
+			var w = Math.ceil(width/n) //размеры частей в пикселах
+			var h = Math.ceil(height/n)
+			
+			var interval = setInterval(function(){
+				var x=w*i, y=h*j //позиция (в пикселах) текущей части
+				var cw = Math.min(width-x, w) //обрезанные (при необходимости) размеры, чтоб не вылезали за пределы буфера
+				var ch = Math.min(width-y, h)
+				
+				module.exports.renderPart(width, height, x, y, cw, ch)
+				var pix = rc.getImageData(x, y, cw, ch)
+				pix.data.set(new Uint8Array(module.exports.memory, 0, pix.data.length))
+				rc.putImageData(pix, x, y)
+				
+				if (++i >= n) { i=0; j++ }
+				if (j >= n) { clearInterval(interval); alert(Date.now()-stt) }
+			}, 1)
+		}
+	</script>
+	
+	<script>
+		var rect = canvas.getBoundingClientRect()
+		canvas.width = rect.width * devicePixelRatio
+		canvas.height = rect.height * devicePixelRatio
+		var rc = canvas.getContext("2d")
+		//setTimeout(function(){ runTest(rc, jsModule) }, 50)
+		wasmModulePromise.then(wasmModule => runTest(rc, wasmModule))
+	</script>
+</html>
