@@ -52,7 +52,7 @@
 	<script>
 		var wasmModulePromise = fetch("main.wasm").
 			then(res => res.arrayBuffer()).
-			then(buf => Wasm.instantiateModule(new Uint8Array(buf)))
+			then(buf => 'Wasm' in window ? Wasm.instantiateModule(new Uint8Array(buf)) : null)
 	</script>
 	
 	<script>
@@ -94,7 +94,7 @@
 			setTimeout(function(){ runTest(rc, jsModule) }, 50)
 		} else {
 			alert("Will run generation via WASM.\nAdd \"#js\" to url and reload to use pure JS.")
-			wasmModulePromise.then(wasmModule => runTest(rc, wasmModule))
+			wasmModulePromise.then(wasmModule => wasmModule ? runTest(rc, wasmModule) : alert("Oups. WASM seems not supported."))
 		}
 	</script>
 </html>
