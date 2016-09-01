@@ -17,13 +17,18 @@
 			
 			// Computes color at position (da, db) with maximum `iters` iterations
 			function getPixVal(da, db, iters) {
-				var a=da, b=db, k=iters
-				while(--k > 0 && a*a+b*b < 4) {
-					var t = a*a - b*b + da
+				var a=da, b=db, k=iters, aa, bb
+				while(1) {
+					k = k-1
+					aa = a*a
+					bb = b*b
+					if (k <= 0 || aa+bb >= 4) break
 					b = 2*a*b + db
-					a = t
+					a = aa - bb + da
 				}
-				return Math.pow(k/iters, 16)
+				var t = k/iters
+				t=t*t; t=t*t; t=t*t; t=t*t //t^16
+				return t
 			}
 			
 			// Computes multiple times color at (da, db) and (h_pix_size, v_pix_size) around it, returns average value

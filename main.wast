@@ -19,26 +19,21 @@
       ;; k = k + 1
       (set_local $k (i32.sub (get_local $k) (i32.const 1)))
       
-      ;; break if (k <= 0 || a*a+b*b >= 4)
+      ;; aa = a*a
+      (set_local $aa (f64.mul (get_local $a) (get_local $a)))
+      ;; bb = b*b
+      (set_local $bb (f64.mul (get_local $b) (get_local $b)))
+      
+      ;; break if (k <= 0 || aa+bb >= 4)
       (br_if
         $k_loop_stop
         (i32.or
           (i32.le_s (get_local $k) (i32.const 0))
-          (f64.ge (f64.add (f64.mul (get_local $a) (get_local $a))
-                           (f64.mul (get_local $b) (get_local $b)))
+          (f64.ge (f64.add (get_local $aa) (get_local $bb))
                   (f64.const 4))
         )
       )
       
-      ;; t = a*a - b*b + da
-      (set_local $t
-        (f64.add
-          (f64.sub (f64.mul (get_local $a) (get_local $a))
-                   (f64.mul (get_local $b) (get_local $b))
-          )
-          (get_local $da)
-        )
-      )
       ;; b = 2*a*b + db
       (set_local $b
         (f64.add
@@ -46,8 +41,13 @@
           (get_local $db)
         )
       )
-      ;; a = t
-      (set_local $a (get_local $t))
+      ;; a = aa - bb + da
+      (set_local $a
+        (f64.add
+          (f64.sub (get_local $aa) (get_local $bb))
+          (get_local $da)
+        )
+      )
       
       (br $k_loop_continue)
     )
