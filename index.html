@@ -8,12 +8,14 @@
 		<canvas id="canvas" style="width:100%; height:100%"></canvas>
 	</body>
 	
+	<!-- JS generator -->
 	<script>
 		var jsModule = (function(){
-			// аналог WASM'овой памяти, чтоб оба способа больше походили друг на друга
+			// analog of WASM's `memoty`, computed chunk data will be stored here
 			var pixels = new Uint8Array(128*65536)
 			var memory = pixels.buffer
 			
+			// Computes color at position (da, db) with maximum `iters` iterations
 			function getPixVal(da, db, iters) {
 				var a=da, b=db, k=iters
 				while(--k > 0 && a*a+b*b < 4) {
@@ -24,6 +26,7 @@
 				return Math.pow(k/iters, 16)
 			}
 			
+			// Computes multiple times color at (da, db) and (h_pix_size, v_pix_size) around it, returns average value
 			function getSampledPixVal(da, db, h_pix_size, v_pix_size, iters) {
 				var sum=0, o=2, n=o*2+1, dh=h_pix_size/n, dv=v_pix_size/n
 				for (var i=-o; i<=o; i++) {
@@ -34,7 +37,11 @@
 				return sum/n/n
 			}
 			
-			function renderPart(width, height, xo, yo, w, h) {
+			// Renders fractal chunk into pixel buffer
+			// width, height - total fractal size in pixels
+			// xo, yo        - top left chunk position
+			// w, h          - chunk size
+			function renderChunk(width, height, xo, yo, w, h) {
 				for (var i=0; i<w; i++) {
 					for (var j=0; j<h; j++) {
 						var scale=2.8, iters=256
@@ -45,16 +52,19 @@
 				}
 			}
 			
-			return {exports: {memory, renderPart}}
+			// makint JS module interface same as WASM's one
+			return {exports: {memory, renderChunk}}
 		})()
 	</script>
 	
+	<!-- WASM generator loader -->
 	<script>
 		var wasmModulePromise = fetch("main.wasm").
 			then(res => res.arrayBuffer()).
 			then(buf => 'Wasm' in window ? Wasm.instantiateModule(new Uint8Array(buf)) : null)
 	</script>
 	
+	<!-- Runner for provided (js of wasm) generator -->
 	<script>
 		function runTest(rc, module) {
 			console.log('running test using', module)
@@ -62,21 +72,23 @@
 			var height = rc.canvas.height
 			
 			var stt = Date.now()
-			var i=0, j=0 //номер текущей части
-			var n = 4 //кол-во частей по каждой из осей
-			var w = Math.ceil(width/n) //размеры частей в пикселах
+			var i=0, j=0 //current chunk indexes
+			var n = 4 //chunks number by each axis
+			var w = Math.ceil(width/n) //chunk size (in pixels)
 			var h = Math.ceil(height/n)
 			
 			var interval = setInterval(function(){
-				var x=w*i, y=h*j //позиция (в пикселах) текущей части
-				var cw = Math.min(width-x, w) //обрезанные (при необходимости) размеры, чтоб не вылезали за пределы буфера
+				var x=w*i, y=h*j //current chunk position (in pixels)
+				var cw = Math.min(width-x, w) //clamp (if need) chunk sizes to fit canvas near edges
 				var ch = Math.min(width-y, h)
 				
-				module.exports.renderPart(width, height, x, y, cw, ch)
+				// rendering part, copying on canvas
+				module.exports.renderChunk(width, height, x, y, cw, ch)
 				var pix = rc.getImageData(x, y, cw, ch)
 				pix.data.set(new Uint8Array(module.exports.memory, 0, pix.data.length))
 				rc.putImageData(pix, x, y)
 				
+				// switching indexes to next iteration or stopping
 				if (++i >= n) { i=0; j++ }
 				if (j >= n) { clearInterval(interval); alert("Done, "+(Date.now()-stt)+"ms.") }
 			}, 1)
@@ -84,11 +96,13 @@
 	</script>
 	
 	<script>
+		// setting up canvas sizes and context
 		var rect = canvas.getBoundingClientRect()
 		canvas.width = rect.width * devicePixelRatio
 		canvas.height = rect.height * devicePixelRatio
 		var rc = canvas.getContext("2d")
 		
+		// run!
 		if (location.hash == "#js") {
 			alert("Will run generation via pure JS.\nRemove \"#js\" and reload to use WASM.")
 			setTimeout(function(){ runTest(rc, jsModule) }, 50)
