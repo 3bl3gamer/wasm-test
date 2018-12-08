@@ -2,21 +2,22 @@
   ;; it will be better to pass correct size to module at init time and
   ;; allocate specific amount of memory (grow_memory operator), but...
   ;; ...but this is enough for test and for now. TODO it of course
-  (memory 128 128)
-  (export "memory" memory)
-  (export "renderChunk" $renderChunk)
+  (memory $memory 128 128)
+  (export "memory" (memory $memory))
+  (export "renderChunk" (func $renderChunk))
   
   
+  ;; Computes color at position (da, db) with maximum `iters` iterations
   (func $getPixVal (param $da f64) (param $db f64)
                    (param $iters i32) (result f64)
-    (local $t f64 $aa f64 $bb f64)
-    (local $a f64 $b f64 $k i32)
+    (local $t f64) (local $aa f64) (local $bb f64)
+    (local $a f64) (local $b f64) (local $k i32)
     (set_local $a (get_local $da))
     (set_local $b (get_local $db))
     (set_local $k (get_local $iters))
     
-    (loop $k_loop_stop $k_loop_continue
-      ;; k = k + 1
+    (block $k_loop_break (loop
+      ;; k = k - 1
       (set_local $k (i32.sub (get_local $k) (i32.const 1)))
       
       ;; aa = a*a
@@ -26,7 +27,7 @@
       
       ;; break if (k <= 0 || aa+bb >= 4)
       (br_if
-        $k_loop_stop
+        $k_loop_break
         (i32.or
           (i32.le_s (get_local $k) (i32.const 0))
           (f64.ge (f64.add (get_local $aa) (get_local $bb))
@@ -49,8 +50,8 @@
         )
       )
       
-      (br $k_loop_continue)
-    )
+      (br 0)
+    ))
     
     ;; t = k/iters
     (set_local $t
@@ -70,11 +71,14 @@
   )
   
   
+  ;; Computes multiple times color at (da, db) and (h_pix_size, v_pix_size) around it, returns average value
   (func $getSampledPixVal (param $da f64) (param $db f64)
                           (param $h_pix_size f64) (param $v_pix_size f64)
                           (param $iters i32) (result f64)
-    (local $i i32 $j i32)
-    (local $sum f64 $o i32 $neg_o i32 $n f64 $dh f64 $dv f64)
+    (local $i i32) (local $j i32)
+    (local $sum f64) (local $o i32) (local $neg_o i32)
+    (local $n f64) (local $dh f64) (local $dv f64)
+
     (set_local $sum (f64.const 0))
     (set_local $o (i32.const 2))
     (set_local $neg_o (i32.sub (i32.const 0) (get_local $o)))
@@ -88,10 +92,10 @@
     (set_local $dv (f64.div (get_local $v_pix_size) (get_local $n))) ;;dv=v_pix_size/n
     
     (set_local $i (get_local $neg_o))
-    (loop $i_loop_stop $i_loop_continue
+    (loop $i_loop
       
       (set_local $j (get_local $neg_o))
-      (loop $j_loop_stop $j_loop_continue
+      (loop $j_loop
         
         ;; sum += getPixVal(da+dh*i, db+dv*j, iters)
         (set_local $sum
@@ -109,12 +113,12 @@
         
         ;; j = j + 1
         (set_local $j (i32.add (get_local $j) (i32.const 1)))
-        (br_if $j_loop_continue (i32.le_s (get_local $j) (get_local $o)))
+        (br_if 0 (i32.le_s (get_local $j) (get_local $o))) ;;continue if j < o
       )
       
       ;; i = i + 1
       (set_local $i (i32.add (get_local $i) (i32.const 1)))
-      (br_if $i_loop_continue (i32.le_s (get_local $i) (get_local $o)))
+      (br_if 0 (i32.le_s (get_local $i) (get_local $o))) ;;continue if i < o
     )
     
     (f64.div (get_local $sum) (f64.mul (get_local $n) (get_local $n)))
@@ -122,21 +126,25 @@
   )
   
   
+  ;; Renders fractal chunk into pixel buffer
+  ;; width, height - total fractal size in pixels
+  ;; xo, yo        - top left chunk position
+  ;; w, h          - chunk size
   (func $renderChunk (param $width i32) (param $height i32)
                     (param $xo i32)    (param $yo i32)
                     (param $w i32)     (param $h i32)
-    (local $i i32 $j i32)
-    (local $da f64 $db f64)
+    (local $i i32) (local $j i32)
+    (local $da f64) (local $db f64)
     
-    (local $scale f64 $iters i32)
+    (local $scale f64) (local $iters i32)
     (set_local $scale (f64.const 2.8))
     (set_local $iters (i32.const 256))
     
     (set_local $i (i32.const 0))
-    (loop $i_loop_stop $i_loop_continue
+    (loop $i_loop
       
       (set_local $j (i32.const 0))
-      (loop $j_loop_stop $j_loop_continue
+      (loop $j_loop
         
         ;; da = -(0.73-(xo+i)/width )*scale
         (set_local $da
@@ -193,12 +201,12 @@
         
         ;; j = j + 1
         (set_local $j (i32.add (get_local $j) (i32.const 1)))
-        (br_if $j_loop_continue (i32.lt_u (get_local $j) (get_local $h)))
+        (br_if 0 (i32.lt_u (get_local $j) (get_local $h))) ;;continue if j < h
       )
       
       ;; i = i + 1
       (set_local $i (i32.add (get_local $i) (i32.const 1)))
-      (br_if $i_loop_continue (i32.lt_u (get_local $i) (get_local $w)))
+      (br_if 0 (i32.lt_u (get_local $i) (get_local $w))) ;;continue if i < w
     )
     ;; renderChunk end
   )

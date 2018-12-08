@@ -12,8 +12,7 @@
 	<script>
 		var jsModule = (function(){
 			// analog of WASM's `memoty`, computed chunk data will be stored here
-			var pixels = new Uint8Array(128*65536)
-			var memory = pixels.buffer
+			var memory = new Uint8Array(128*65536)
 			
 			// Computes color at position (da, db) with maximum `iters` iterations
 			function getPixVal(da, db, iters) {
@@ -52,7 +51,7 @@
 						var scale=2.8, iters=256
 						var da = -(0.73-(xo+i)/width )*scale
 						var db =  (0.5 -(yo+j)/height)*scale
-						pixels[(i+j*w)*4+3] = 255*getSampledPixVal(da, db, scale/width, scale/height, iters)
+						memory[(i+j*w)*4+3] = 255*getSampledPixVal(da, db, scale/width, scale/height, iters)
 					}
 				}
 			}
@@ -66,7 +65,7 @@
 	<script>
 		var wasmModulePromise = fetch("main.wasm").
 			then(res => res.arrayBuffer()).
-			then(buf => 'Wasm' in window ? Wasm.instantiateModule(new Uint8Array(buf)) : null)
+			then(buf => 'WebAssembly' in window ? WebAssembly.instantiate(new Uint8Array(buf), {}) : null)
 	</script>
 	
 	<!-- Runner for provided (js of wasm) generator -->
@@ -90,7 +89,7 @@
 				// rendering part, copying on canvas
 				module.exports.renderChunk(width, height, x, y, cw, ch)
 				var pix = rc.getImageData(x, y, cw, ch)
-				pix.data.set(new Uint8Array(module.exports.memory, 0, pix.data.length))
+				pix.data.set(new Uint8Array(module.exports.memory.buffer, 0, pix.data.length))
 				rc.putImageData(pix, x, y)
 				
 				// switching indexes to next iteration or stopping
@@ -113,7 +112,7 @@
 			setTimeout(function(){ runTest(rc, jsModule) }, 50)
 		} else {
 			alert("Will run generation via WASM.\nAdd \"#js\" to url and reload to use pure JS.")
-			wasmModulePromise.then(wasmModule => wasmModule ? runTest(rc, wasmModule) : alert("Oups. WASM seems not supported."))
+			wasmModulePromise.then(wasmModule => wasmModule ? runTest(rc, wasmModule.instance) : alert("Oups. WASM seems not supported."))
 		}
 	</script>
 </html>

@@ -9,3 +9,4 @@ Try here https://3bl3gamer.github.io/wasm-test/ (WASM generator) or here https:/
 Generates something like this:
 ![example](https://3bl3gamer.github.io/wasm-test/example.png)
 
+On how to rebuild main.wasm check out https://developer.mozilla.org/en-US/docs/WebAssembly/Text_format_to_wasm and https://github.com/webassembly/wabt
